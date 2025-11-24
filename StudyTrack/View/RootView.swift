@@ -5,7 +5,6 @@
 //  Created by Hugo Gomes on 11/10/25.
 //
 
-// RootView.swift - VERSÃO COMPLETA E INTEGRADA
 import SwiftUI
 
 struct RootView: View {
@@ -20,6 +19,8 @@ struct RootView: View {
     @State private var selectedTab: Tab = .home
     @State private var showProfile = false
     @Namespace private var animation
+    
+    @AppStorage("appColorScheme") private var appColorScheme: String = "system"
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -57,6 +58,7 @@ struct RootView: View {
         }
         .onAppear {
             streakManager.checkStreakStatus()
+            streakManager.setStreak(to: 8)
             setupNotifications()
         }
         .overlay {
@@ -72,6 +74,15 @@ struct RootView: View {
                     }
             }
         }
+        .preferredColorScheme(resolveColorScheme(appColorScheme))
+    }
+    
+    private func resolveColorScheme(_ value: String) -> ColorScheme? {
+        switch value {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
     }
     
     private func setupNotifications() {
@@ -85,7 +96,6 @@ struct RootView: View {
             }
         }
         
-        // Quick Session
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("StartQuickSession"),
             object: nil,
@@ -275,4 +285,3 @@ struct FreezeUsedAlert: View {
 #Preview {
     RootView()
 }
-

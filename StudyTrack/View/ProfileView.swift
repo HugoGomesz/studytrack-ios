@@ -19,8 +19,12 @@ struct ProfileView: View {
     @State private var showImagePicker = false
     @State private var showActionSheet = false
     @State private var scrollOffset: CGFloat = 0
+    @State private var showPrivacySheet = false
+    @State private var showHelpSheet = false
+    @State private var showAppearanceSheet = false
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @AppStorage("appColorScheme") private var appColorScheme: String = "system"
     
     var body: some View {
         ZStack {
@@ -82,6 +86,18 @@ struct ProfileView: View {
                 set: { profileManager.updateProfileImage($0) }
             ))
         }
+        .sheet(isPresented: $showPrivacySheet) {
+            PrivacyTermsView()
+                .preferredColorScheme(resolveColorScheme(appColorScheme))
+        }
+        .sheet(isPresented: $showHelpSheet) {
+            HelpTermsView()
+                .preferredColorScheme(resolveColorScheme(appColorScheme))
+        }
+        .sheet(isPresented: $showAppearanceSheet) {
+            AppearanceSheetView()
+                .preferredColorScheme(resolveColorScheme(appColorScheme))
+        }
         .confirmationDialog("Foto de Perfil", isPresented: $showActionSheet) {
             Button("Escolher da Galeria") {
                 showImagePicker = true
@@ -100,6 +116,7 @@ struct ProfileView: View {
         .onAppear {
             editedName = profileManager.userName
         }
+        .preferredColorScheme(resolveColorScheme(appColorScheme))
     }
     
     private var dynamicBackground: some View {
@@ -250,7 +267,7 @@ struct ProfileView: View {
             }
             .scaleEffect(1 - min(max(scrollOffset, 0) / 500, 0.3))
             
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 if isEditingName {
                     HStack(spacing: 12) {
                         TextField("Nome", text: $editedName)
@@ -320,13 +337,7 @@ struct ProfileView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.primary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 12, y: 6)
-                )
+                .padding(.top, 2)
             }
         }
         .frame(height: 400)
@@ -464,12 +475,6 @@ struct ProfileView: View {
                     .foregroundStyle(.primary)
                 
                 Spacer()
-                
-                Button {} label: {
-                    Text("Ver todas")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(AppColors.primary)
-                }
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -490,10 +495,24 @@ struct ProfileView: View {
     
     private var settingsSection: some View {
         VStack(spacing: 12) {
-            GlassSettingRow(icon: "bell.badge.fill", title: "Notificações", color: AppColors.secondary, colorScheme: colorScheme)
-            GlassSettingRow(icon: "paintbrush.pointed.fill", title: "Aparência", color: AppColors.primary, colorScheme: colorScheme)
-            GlassSettingRow(icon: "lock.shield.fill", title: "Privacidade", color: AppColors.secondary, colorScheme: colorScheme)
-            GlassSettingRow(icon: "questionmark.circle.fill", title: "Ajuda", color: AppColors.primary, colorScheme: colorScheme)
+            
+            Button {
+                showAppearanceSheet = true
+            } label: {
+                GlassSettingRowContent(icon: "paintbrush.pointed.fill", title: "Aparência", color: AppColors.primary, colorScheme: colorScheme)
+            }
+            
+            Button {
+                showPrivacySheet = true
+            } label: {
+                GlassSettingRowContent(icon: "lock.shield.fill", title: "Privacidade", color: AppColors.secondary, colorScheme: colorScheme)
+            }
+            
+            Button {
+                showHelpSheet = true
+            } label: {
+                GlassSettingRowContent(icon: "questionmark.circle.fill", title: "Ajuda", color: AppColors.primary, colorScheme: colorScheme)
+            }
             
             Button {
                 profileManager.resetProfile()
@@ -645,32 +664,43 @@ struct GlassSettingRow: View {
     
     var body: some View {
         Button {} label: {
-            HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        Circle()
-                            .fill(color.opacity(colorScheme == .dark ? 0.25 : 0.15))
-                    )
-                
-                Text(title)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary.opacity(0.5))
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(colorScheme == .dark ? Color(white: 0.12) : .white)
-            )
+            GlassSettingRowContent(icon: icon, title: title, color: color, colorScheme: colorScheme)
         }
+    }
+}
+
+struct GlassSettingRowContent: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let colorScheme: ColorScheme
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(color.opacity(colorScheme == .dark ? 0.25 : 0.15))
+                )
+            
+            Text(title)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.primary)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary.opacity(0.5))
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(colorScheme == .dark ? Color(white: 0.12) : .white)
+        )
     }
 }
 
@@ -678,6 +708,207 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+// MARK: - Privacy Terms Sheet
+struct PrivacyTermsView: View {
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Privacidade")
+                        .font(AppTypography.title1)
+                    
+                    Text("Última atualização: 11/2025")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Group {
+                        Text("1. Coleta de Dados")
+                            .font(AppTypography.title3)
+                        Text("Coletamos apenas informações necessárias para funcionamento do app, como seu nome de perfil, foto (se fornecida), progresso de estudo, tarefas e preferências. Esses dados são armazenados localmente no seu dispositivo. Não vendemos, alugamos ou compartilhamos seus dados com terceiros.")
+                            .font(AppTypography.body)
+                        
+                        Text("2. Permissões")
+                            .font(AppTypography.title3)
+                            .padding(.top, 8)
+                        Text("O app pode solicitar permissões para notificações, fotos (para sua imagem de perfil) e outras integrações locais. Você pode gerenciar essas permissões nos ajustes do sistema.")
+                            .font(AppTypography.body)
+                        
+                        Text("3. Segurança")
+                            .font(AppTypography.title3)
+                            .padding(.top, 8)
+                        Text("Empregamos práticas de segurança para proteger seus dados locais. Recomendamos manter seu dispositivo atualizado e protegido por senha.")
+                            .font(AppTypography.body)
+                        
+                        Text("4. Retenção e Exclusão")
+                            .font(AppTypography.title3)
+                            .padding(.top, 8)
+                        Text("Você pode redefinir o perfil e dados do app nas configurações internas. A exclusão remove seus dados locais do dispositivo.")
+                            .font(AppTypography.body)
+                        
+                        Text("5. Contato")
+                            .font(AppTypography.title3)
+                            .padding(.top, 8)
+                        Text("Em caso de dúvidas sobre privacidade, entre em contato pelo suporte indicado na seção de Ajuda.")
+                            .font(AppTypography.body)
+                    }
+                }
+                .padding()
+            }
+            .background(AppColors.background.ignoresSafeArea())
+            .navigationTitle("Privacidade")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fechar") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Help Terms Sheet
+struct HelpTermsView: View {
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Ajuda")
+                        .font(AppTypography.title1)
+                    
+                    Text("Perguntas frequentes")
+                        .font(AppTypography.title3)
+                        .padding(.top, 8)
+                    
+                    Group {
+                        FAQItem(
+                            title: "Como começar uma sessão de estudo?",
+                            text: "Vá até a aba Foco, escolha um tipo de sessão (Pomodoro, Deep Work, etc.) e toque em Iniciar."
+                        )
+                        FAQItem(
+                            title: "Como ajustar minha meta diária?",
+                            text: "Na Home, toque no ícone de lápis na seção Progresso Diário para definir suas horas de estudo."
+                        )
+                        FAQItem(
+                            title: "Como funcionam as conquistas?",
+                            text: "Você desbloqueia conquistas ao manter streaks, atingir metas e completar tarefas. Veja todas na Home em Conquistas."
+                        )
+                        FAQItem(
+                            title: "O que é Streak e como proteger?",
+                            text: "Streak é a sequência de dias estudando. Você pode usar congelamentos para proteger seu streak em Streak > Detalhes."
+                        )
+                    }
+                    
+                    Text("Contato e Suporte")
+                        .font(AppTypography.title3)
+                        .padding(.top, 8)
+                    
+                    Text("Se precisar de ajuda adicional, envie um e-mail para suporte@studytrack.app. Estamos aqui para ajudar!")
+                        .font(AppTypography.body)
+                }
+                .padding()
+            }
+            .background(AppColors.background.ignoresSafeArea())
+            .navigationTitle("Ajuda")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fechar") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct FAQItem: View {
+    let title: String
+    let text: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(AppTypography.bodyBold)
+            Text(text)
+                .font(AppTypography.body)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(AppColors.cardBackground)
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        )
+    }
+}
+
+// MARK: - Appearance Sheet
+struct AppearanceSheetView: View {
+    @Environment(\.dismiss) var dismiss
+    @AppStorage("appColorScheme") private var appColorScheme: String = "system"
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Aparência")
+                        .font(AppTypography.title2)
+                    Text("Escolha como o app deve se comportar em relação ao tema de cor.")
+                        .font(AppTypography.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.top, 20)
+                
+                Picker("", selection: $appColorScheme) {
+                    Text("Sistema").tag("system")
+                    Text("Claro").tag("light")
+                    Text("Escuro").tag("dark")
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                
+                Spacer()
+                
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Concluir")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(AppColors.primaryGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: AppColors.primary.opacity(0.3), radius: 15, y: 8)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 30)
+            }
+            .background(AppColors.background.ignoresSafeArea())
+            .navigationTitle("Aparência")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fechar") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(resolveColorScheme(appColorScheme))
+    }
+}
+
+func resolveColorScheme(_ value: String) -> ColorScheme? {
+    switch value {
+    case "light": return .light
+    case "dark": return .dark
+    default: return nil
     }
 }
 

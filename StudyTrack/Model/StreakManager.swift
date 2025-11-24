@@ -127,6 +127,20 @@ class StreakManager: ObservableObject {
         }
     }
     
+    // MARK: - Force/Seed Streak (Demo)
+    
+    func setStreak(to days: Int) {
+        let clamped = max(0, days)
+        currentStreak = clamped
+        if currentStreak > longestStreak {
+            longestStreak = currentStreak
+        }
+ 
+        lastStudyDate = Calendar.current.startOfDay(for: Date())
+        saveStreak()
+        print("🔧 Streak definido manualmente para \(currentStreak) dia(s).")
+    }
+    
     // MARK: - Freeze Management
     
     func useFreeze() {
@@ -173,3 +187,4 @@ class StreakManager: ObservableObject {
         print("❄️ Comprou \(quantity) freeze(s)! Total: \(streakFreezes)")
     }
 }
+

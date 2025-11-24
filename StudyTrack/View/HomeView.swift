@@ -12,6 +12,7 @@ struct HomeView: View {
     @EnvironmentObject var sessionManager: SessionManager
     @EnvironmentObject var streakManager: StreakManager
     @EnvironmentObject var profileManager: ProfileManager
+    @EnvironmentObject var timerManager: TimerManager
     
     @State private var showAchievements = false
     @State private var showEditGoalSheet = false
@@ -43,6 +44,12 @@ struct HomeView: View {
             .padding(.bottom, 120)
         }
         .background(AppColors.background.ignoresSafeArea())
+        .sheet(isPresented: $showAchievements) {
+            AchievementsShelfSheet(
+                items: buildAchievements(),
+                unlockedCount: buildAchievements().filter { $0.isUnlocked }.count
+            )
+        }
     }
     
     private var headerSection: some View {
@@ -210,65 +217,78 @@ struct HomeView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    QuickSessionCard(
-                        title: "Pomodoro",
-                        duration: "25 min",
-                        icon: "timer",
-                        color: AppColors.accent,
-                        gradient: LinearGradient(
-                            colors: [AppColors.accentLight, AppColors.accent],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        action: {
-                            startQuickSession(type: .pomodoro)
-                        }
-                    )
+                    quickCard(for: .pomodoro,
+                              title: "Pomodoro",
+                              duration: "25 min",
+                              icon: "timer",
+                              color: AppColors.accent,
+                              gradient: LinearGradient(
+                                colors: [AppColors.accentLight, AppColors.accent],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                              ))
                     
-                    QuickSessionCard(
-                        title: "Deep Work",
-                        duration: "90 min",
-                        icon: "brain.head.profile",
-                        color: AppColors.secondary,
-                        gradient: LinearGradient(
-                            colors: [AppColors.secondaryLight, AppColors.secondary],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        action: {
-                            startQuickSession(type: .deepWork)
-                        }
-                    )
+                    quickCard(for: .deepWork,
+                              title: "Deep Work",
+                              duration: "90 min",
+                              icon: "brain.head.profile",
+                              color: AppColors.secondary,
+                              gradient: LinearGradient(
+                                colors: [AppColors.secondaryLight, AppColors.secondary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                              ))
                     
-                    QuickSessionCard(
-                        title: "Short Focus",
-                        duration: "15 min",
-                        icon: "bolt.fill",
-                        color: AppColors.primary,
-                        gradient: AppColors.primaryGradient,
-                        action: {
-                            startQuickSession(type: .shortFocus)
-                        }
-                    )
+                    quickCard(for: .shortFocus,
+                              title: "Short Focus",
+                              duration: "15 min",
+                              icon: "bolt.fill",
+                              color: AppColors.primary,
+                              gradient: AppColors.primaryGradient)
                     
-                    QuickSessionCard(
-                        title: "Custom",
-                        duration: "Personalizar",
-                        icon: "slider.horizontal.3",
-                        color: AppColors.focusPurple,
-                        gradient: LinearGradient(
-                            colors: [AppColors.focusPurple.opacity(0.8), AppColors.focusPurple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        action: {
-                            startQuickSession(type: .custom)
-                        }
-                    )
+                    quickCard(for: .custom,
+                              title: "Custom",
+                              duration: "Personalizar",
+                              icon: "slider.horizontal.3",
+                              color: AppColors.focusPurple,
+                              gradient: LinearGradient(
+                                colors: [AppColors.focusPurple.opacity(0.8), AppColors.focusPurple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                              ))
                 }
                 .padding(.horizontal, AppSpacing.md)
             }
         }
+    }
+    
+    private func quickCard(for type: TimerManager.SessionType,
+                           title: String,
+                           duration: String,
+                           icon: String,
+                           color: Color,
+                           gradient: LinearGradient) -> some View {
+        let isRunning = timerManager.isRunning || timerManager.isPaused
+        let isActiveType = timerManager.selectedSession == type
+        let shouldDim = isRunning && !isActiveType
+        
+        return QuickSessionCard(
+            title: title,
+            duration: duration,
+            icon: icon,
+            color: color,
+            gradient: gradient,
+            isDimmed: shouldDim,
+            isActive: isRunning && isActiveType,
+            action: {
+                if isRunning {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.warning)
+                    return
+                }
+                startQuickSession(type: type)
+            }
+        )
     }
     
     private var tasksProgressSection: some View {
@@ -517,6 +537,7 @@ struct GoalPresetButton: View {
         }
     }
 }
+
 // MARK: - Supporting Views
 
 struct QuickSessionCard: View {
@@ -525,6 +546,8 @@ struct QuickSessionCard: View {
     let icon: String
     let color: Color
     let gradient: LinearGradient
+    var isDimmed: Bool = false
+    var isActive: Bool = false
     let action: () -> Void
     
     var body: some View {
@@ -539,11 +562,29 @@ struct QuickSessionCard: View {
                             .fill(gradient)
                             .shadow(color: color.opacity(0.4), radius: 10, y: 5)
                     )
+                    .overlay(
+                        Circle()
+                            .stroke(isActive ? color.opacity(0.6) : .clear, lineWidth: 3)
+                    )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.primary)
+                        
+                        if isActive {
+                            Text("Em andamento")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(color)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(color.opacity(0.12))
+                                )
+                        }
+                    }
                     
                     Text(duration)
                         .font(.system(size: 14, weight: .medium))
@@ -563,6 +604,8 @@ struct QuickSessionCard: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
+        .opacity(isDimmed ? 0.4 : 1.0)
+        .allowsHitTesting(!isDimmed)
     }
 }
 
@@ -679,10 +722,197 @@ struct ScaleButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Achievements Shelf (Bottom Sheet)
+
+struct AchievementItem: Identifiable {
+    let id = UUID()
+    let icon: String
+    let title: String
+    let color: Color
+    let isUnlocked: Bool
+    let description: String?
+}
+
+struct AchievementsShelfSheet: View {
+    let items: [AchievementItem]
+    let unlockedCount: Int
+    @Environment(\.dismiss) var dismiss
+    
+    let columns = [
+        GridItem(.adaptive(minimum: 120), spacing: 16)
+    ]
+    
+    var body: some View {
+        NavigationView {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    header
+                    
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(items) { item in
+                            AchievementShelfCard(item: item)
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    Spacer(minLength: 20)
+                }
+                .padding(.vertical, 20)
+                .background(AppColors.background.ignoresSafeArea())
+            }
+            .navigationTitle("Conquistas")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fechar") { dismiss() }
+                }
+            }
+        }
+    }
+    
+    private var header: some View {
+        VStack(spacing: 8) {
+            Text("Sua Estante")
+                .font(.system(size: 22, weight: .bold))
+            
+            Text("\(unlockedCount) de \(items.count) conquistas desbloqueadas")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct AchievementShelfCard: View {
+    let item: AchievementItem
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        item.isUnlocked
+                        ? RadialGradient(
+                            colors: [item.color.opacity(0.35), item.color.opacity(0.12), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 50
+                        )
+                        : RadialGradient(
+                            colors: [Color.gray.opacity(0.25), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 50
+                        )
+                    )
+                    .frame(width: 80, height: 80)
+                
+                Image(systemName: item.isUnlocked ? item.icon : "lock.fill")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(item.isUnlocked ? item.color : .secondary)
+            }
+            
+            VStack(spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity)
+                
+                if let desc = item.description {
+                    Text(desc)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 150)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(AppColors.cardBackground)
+                .shadow(color: .black.opacity(0.05), radius: 10, y: 5)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(item.isUnlocked ? item.color.opacity(0.25) : Color.gray.opacity(0.15), lineWidth: 1)
+        )
+        .opacity(item.isUnlocked ? 1.0 : 0.6)
+    }
+}
+
+// MARK: - Achievements Builder
+
+extension HomeView {
+    func buildAchievements() -> [AchievementItem] {
+        let has3Streak = streakManager.currentStreak >= 3
+        let has7Streak = streakManager.currentStreak >= 7
+        let dailyGoalDone = sessionManager.progressPercentage >= 1.0
+        let allTasksDone = taskCompletionRate >= 1.0 && !taskStore.tasks.isEmpty
+        let hours10 = sessionManager.hoursStudiedToday >= 10
+        let firstSession = sessionManager.sessions.count > 0
+        
+        return [
+            AchievementItem(icon: "flame.fill",
+                            title: "3 dias seguidos",
+                            color: .orange,
+                            isUnlocked: has3Streak,
+                            description: "Mantenha o foco por 3 dias."),
+            AchievementItem(icon: "flame.fill",
+                            title: "7 dias seguidos",
+                            color: .orange,
+                            isUnlocked: has7Streak,
+                            description: "Uma semana completa de estudos!"),
+            AchievementItem(icon: "target",
+                            title: "Meta diária alcançada",
+                            color: .green,
+                            isUnlocked: dailyGoalDone,
+                            description: "Complete sua meta de hoje."),
+            AchievementItem(icon: "checkmark.circle.fill",
+                            title: "Todas tarefas concluídas",
+                            color: .blue,
+                            isUnlocked: allTasksDone,
+                            description: "Zere sua lista do dia."),
+            AchievementItem(icon: "star.fill",
+                            title: "10 horas em um dia",
+                            color: .yellow,
+                            isUnlocked: hours10,
+                            description: "Maratona de estudos."),
+            AchievementItem(icon: "bolt.fill",
+                            title: "Primeira sessão",
+                            color: .purple,
+                            isUnlocked: firstSession,
+                            description: "Tudo começa com um passo."),
+            AchievementItem(icon: "brain.head.profile",
+                            title: "Deep Work concluído",
+                            color: .indigo,
+                            isUnlocked: sessionManager.sessions.contains { $0.type == TimerManager.SessionType.deepWork.rawValue },
+                            description: "Sessão de 90 minutos finalizada."),
+            AchievementItem(icon: "timer",
+                            title: "Pomodoro concluído",
+                            color: .red,
+                            isUnlocked: sessionManager.sessions.contains { $0.type == TimerManager.SessionType.pomodoro.rawValue },
+                            description: "25 minutos de foco concluídos."),
+            AchievementItem(icon: "cup.and.saucer.fill",
+                            title: "Pausa responsável",
+                            color: .brown,
+                            isUnlocked: false,
+                            description: "Use pausas para recarregar."),
+            AchievementItem(icon: "crown.fill",
+                            title: "Mestre do foco",
+                            color: .yellow,
+                            isUnlocked: has7Streak && dailyGoalDone,
+                            description: "Mantenha uma semana e bata a meta.")
+        ]
+    }
+}
+
 #Preview {
     HomeView()
         .environmentObject(TaskStore())
         .environmentObject(SessionManager())
         .environmentObject(StreakManager())
         .environmentObject(ProfileManager())
+        .environmentObject(TimerManager())
 }

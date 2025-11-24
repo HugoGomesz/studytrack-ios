@@ -93,42 +93,33 @@ struct TimerView: View {
               let wasBreakTime = userInfo["wasBreakTime"] as? Bool else { return }
         
         if wasBreakTime {
-            // Pausa terminou
             handleBreakCompletion()
         } else {
-            // Foco terminou
             handleFocusCompletion()
         }
     }
     
-    /// Chamado quando o tempo de FOCO termina
     private func handleFocusCompletion() {
         print("🎯 Foco completado!")
         
-        // Cancela notificação de foco
         NotificationManager.instance.cancelTimerNotifications()
         
         let minutesStudied = timerManager.actualMinutesStudied
         
-        // Celebração com tempo REAL
         NotificationManager.instance.sendCelebrationNotification(
             message: "Você completou \(minutesStudied) minutos de foco! 🎉"
         )
         
-        // Atualiza streak
         streakManager.incrementStreak()
         NotificationManager.instance.updateStreakProtectionNumber(newStreak: streakManager.currentStreak)
         
-        // Registra sessão com tempo REAL
         sessionManager.addSession(
             duration: minutesStudied,
             type: timerManager.selectedSession.rawValue
         )
         
-        // XP baseado no tempo REAL
         levelSystem.addExperience(points: minutesStudied * 2)
         
-        // Auto-start pausa
         autoStartBreak = UserDefaults.standard.bool(forKey: "autoStartBreak")
         if autoStartBreak {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -137,29 +128,20 @@ struct TimerView: View {
         }
     }
     
-    /// Chamado quando o tempo de PAUSA termina
     private func handleBreakCompletion() {
         print("☕ Pausa completada!")
-        
-        // Cancela notificação de pausa
         NotificationManager.instance.cancelTimerNotifications()
-        
-        // Notifica que pode voltar ao foco
         NotificationManager.instance.sendCelebrationNotification(
             message: "Pausa finalizada! Pronto para mais uma sessão? 💪"
         )
     }
     
-    /// Inicia o timer de pausa automaticamente
     private func startBreakTimer() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             timerManager.startBreak()
-            
-            // Agenda notificação para quando a pausa terminar
             let breakDuration = timerManager.breakMinutes * 60
             NotificationManager.instance.scheduleBreakCompletion(duration: TimeInterval(breakDuration))
         }
-        
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
     }
@@ -388,14 +370,19 @@ struct TimerView: View {
     }
     
     private var sessionSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        let isRunningOrPaused = timerManager.isRunning || timerManager.isPaused
+        
+        return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(TimerManager.SessionType.allCases, id: \.self) { type in
+                    let isActive = timerManager.selectedSession == type
+                    let isDimmed = isRunningOrPaused && !isActive
+                    
                     SessionPill(
                         type: type,
-                        isSelected: timerManager.selectedSession == type
+                        isSelected: isActive
                     ) {
-                        if !timerManager.isRunning && !timerManager.isPaused {
+                        if !isRunningOrPaused {
                             if type == .custom {
                                 showCustomTimer = true
                             } else {
@@ -405,6 +392,8 @@ struct TimerView: View {
                             }
                         }
                     }
+                    .opacity(isDimmed ? 0.4 : 1.0)
+                    .allowsHitTesting(!isDimmed)
                 }
             }
             .padding(.horizontal, AppSpacing.lg)
@@ -442,14 +431,10 @@ struct TimerView: View {
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     if timerManager.isRunning {
-                        // PAUSOU - cancela notificações agendadas
                         timerManager.pauseTimer()
                         NotificationManager.instance.cancelTimerNotifications()
                     } else {
-                        // INICIOU - agenda notificação para quando terminar
                         timerManager.startTimer()
-                        
-                        // Agenda notificação baseado no tipo de timer
                         let remainingSeconds = timerManager.timeRemaining
                         if timerManager.isBreakTime {
                             NotificationManager.instance.scheduleBreakCompletion(duration: remainingSeconds)
@@ -458,7 +443,6 @@ struct TimerView: View {
                         }
                     }
                 }
-                
                 let impact = UIImpactFeedbackGenerator(style: .heavy)
                 impact.impactOccurred()
             } label: {
@@ -521,7 +505,6 @@ struct TimerView: View {
                     }
                 } else {
                     timerManager.addTime(minutes: 5)
-                    // Reagenda notificação com tempo adicional
                     if timerManager.isRunning {
                         NotificationManager.instance.cancelTimerNotifications()
                         let remainingSeconds = timerManager.timeRemaining
@@ -554,11 +537,6 @@ struct TimerView: View {
         }
     }
 }
-
-// MARK: - Notification Name Extension
-//extension Notification.Name {
-//    static let timerCompleted = Notification.Name("timerCompleted")
-//}
 
 // MARK: - Session Pill
 struct SessionPill: View {
@@ -1041,7 +1019,6 @@ struct CustomTimerSheet: View {
         }
     }
     
-    // MARK: - Summary Row
     struct SummaryRow: View {
         let icon: String
         let label: String
