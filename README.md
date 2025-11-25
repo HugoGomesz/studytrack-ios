@@ -5,7 +5,7 @@ Aplicativo iOS desenvolvido para ajudar estudantes a organizar o tempo de estudo
 ## Visão Geral
 
 O **StudyTrack** une produtividade e motivação, proporcionando ferramentas completas para:
-- Agendar e gerenciar sessões de estudo
+- Gerenciar sessões de estudo
 - Definir e acompanhar metas personalizadas
 - Receber lembretes inteligentes por notificações locais
 - Visualizar o histórico de atividades e analisar sua evolução
